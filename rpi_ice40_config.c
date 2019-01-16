@@ -31,6 +31,7 @@ void ERR(char* msg) {
  * options:
  * bit bang (instead of native SPI mode)
  * speed (allow slower load)
+ * reset other (default reset target only)
  *
  * ICE1 SRAM - Hold ICE2 in reset, switch SPI_MUX low, flash power EN low
  * ICE2 SRAM - Hold ICE1 in reset, switch SPI_MUX X, flash power EN low,  use CS1
@@ -54,6 +55,7 @@ typedef struct {
   int speed;
   spi_mode_t mode;
   config_target_t target;
+  int reset_both;
   char* bit_fname;
 } options_t;
 
@@ -63,11 +65,15 @@ options_t parse_args(int argc, char* const* argv) {
     1,
     MODE_SPI_NATIVE,
     TARGET_NONE,
+    0,
     "",
   };
 
-  while (-1 != (opt = getopt(argc, argv, "bs:12f"))) {
+  while (-1 != (opt = getopt(argc, argv, "brs:12f"))) {
     switch(opt) {
+    case 'r':
+      option.reset_both = 1;
+      break;
     case 'b':
       option.mode = MODE_SPI_BITBANG;
       break;
@@ -144,8 +150,12 @@ int main(int argc, char* const* argv) {
   bcm2835_gpio_fsel(ICE40_EN_FLASH_POWER, BCM2835_GPIO_FSEL_OUTP);
   bcm2835_gpio_fsel(ICE40_SEL_SPI_MUX, BCM2835_GPIO_FSEL_OUTP);
 
-  bcm2835_gpio_write(ICE40_CRESET_B_1, LOW);
-  bcm2835_gpio_write(ICE40_CRESET_B_2, LOW);
+  if (opts.reset_both) {
+    bcm2835_gpio_write(ICE40_CRESET_B_1, LOW);
+    bcm2835_gpio_write(ICE40_CRESET_B_2, LOW);
+  } else {
+    bcm2835_gpio_write(reset, LOW);
+  }
   bcm2835_delay(10);
 
   if (opts.target == TARGET_ICE1 || opts.target == TARGET_ICE2) {
